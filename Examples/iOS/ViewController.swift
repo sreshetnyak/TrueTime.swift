@@ -45,7 +45,6 @@ final class ExampleViewController: UIViewController {
         super.viewWillAppear(animated)
         refresh()
         startTimer()
-
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -85,7 +84,7 @@ private extension ExampleViewController {
     }
 
     func refresh() {
-        TrueTimeClient.sharedInstance.fetchIfNeeded { result in
+        TrueTimeClient.sharedInstance.fetchIfNeeded(completion: { result in
             switch result {
             case let .success(referenceTime):
                 self.referenceTime = referenceTime
@@ -93,6 +92,6 @@ private extension ExampleViewController {
             case let .failure(error):
                 print("Error! \(error)")
             }
-        }
+        })
     }
 }

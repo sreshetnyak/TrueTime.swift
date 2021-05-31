@@ -8,7 +8,7 @@
 
 import Foundation
 
-protocol TimedOperation: class {
+protocol TimedOperation: AnyObject {
     var started: Bool { get }
     var timeout: TimeInterval { get }
     var timer: DispatchSourceTimer? { get set }
