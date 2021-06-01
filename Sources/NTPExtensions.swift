@@ -9,6 +9,7 @@
 import Foundation
 
 public extension timeval {
+    
     static func uptime() -> timeval {
         let now = timeval.now()
         var boottime = timeval()
@@ -24,6 +25,7 @@ public extension timeval {
 }
 
 extension timeval {
+    
     static func now() -> timeval {
         var tv = timeval()
         withFatalErrno { gettimeofday(&tv, nil) }
@@ -55,6 +57,7 @@ extension NTPTimeType {
 }
 
 extension NTPTimevalConvertible {
+    
     init(timeSince1970 time: timeval) {
         precondition(time.tv_sec >= 0 && time.tv_usec >= 0, "Time must be positive \(time)")
         self.init(whole: ValueType(UInt64(time.tv_sec) + UInt64(secondsFrom1900To1970)),

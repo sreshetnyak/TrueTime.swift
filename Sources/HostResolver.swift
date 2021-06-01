@@ -17,7 +17,6 @@ final class HostResolver {
     let timeout: TimeInterval
     let onComplete: HostCallback
     let callbackQueue: DispatchQueue
-    var logger: LogCallback?
 
     /// Resolves the given hosts in order, returning the first resolved
     /// addresses or an error if none succeeded.
@@ -31,14 +30,12 @@ final class HostResolver {
     ///                         or when all hosts fail
     static func resolve(hosts: [(host: String, port: Int)],
                         timeout: TimeInterval,
-                        logger: LogCallback?,
                         callbackQueue: DispatchQueue,
                         onComplete: @escaping HostCallback) {
-        precondition(!hosts.isEmpty, "Must include at least one URL")
+        guard !hosts.isEmpty else { return }
         let host = HostResolver(host: hosts[0].host,
                                 port: hosts[0].port,
                                 timeout: timeout,
-                                logger: logger,
                                 callbackQueue: callbackQueue) { host, result in
             switch result {
             case .success,
@@ -46,7 +43,6 @@ final class HostResolver {
             case .failure:
                 resolve(hosts: Array(hosts.dropFirst()),
                         timeout: timeout,
-                        logger: logger,
                         callbackQueue: callbackQueue,
                         onComplete: onComplete)
             }
@@ -58,13 +54,11 @@ final class HostResolver {
     required init(host: String,
                   port: Int,
                   timeout: TimeInterval,
-                  logger: LogCallback?,
                   callbackQueue: DispatchQueue,
                   onComplete: @escaping HostCallback) {
         self.host = host
         self.port = port
         self.timeout = timeout
-        self.logger = logger
         self.onComplete = onComplete
         self.callbackQueue = callbackQueue
     }
@@ -125,17 +119,12 @@ final class HostResolver {
         }
     }
 
-    func debugLog(_ message: @autoclosure () -> String) {
-#if DEBUG_LOGGING
-        logger?(message())
-#endif
-    }
-
     var timer: DispatchSourceTimer?
     fileprivate let lockQueue = DispatchQueue(label: "com.instacart.dns.host")
     fileprivate var networkHost: CFHost?
     fileprivate var resolved: Bool = false
     fileprivate var callbackPending: Bool = false
+    
     private let hostCallback: CFHostClientCallBack = { host, infoType, error, info in
         guard let info = info else { return }
         let retainedClient = Unmanaged<HostResolver>.fromOpaque(info)
@@ -147,7 +136,9 @@ final class HostResolver {
 }
 
 extension HostResolver: TimedOperation {
+    
     var timerQueue: DispatchQueue { return lockQueue }
+    
     var started: Bool { return self.networkHost != nil }
 
     func timeoutError(_ error: NSError) {
@@ -156,6 +147,7 @@ extension HostResolver: TimedOperation {
 }
 
 private extension HostResolver {
+    
     func complete(_ result: HostResult) {
         stop()
         callbackQueue.async {
@@ -164,13 +156,9 @@ private extension HostResolver {
     }
 
     func connect(_ host: CFHost) {
-        debugLog("Got CFHostStartInfoResolution callback")
         lockQueue.async {
-            guard self.started && !self.resolved else {
-                self.debugLog("Closed")
-                return
-            }
-
+            guard self.started && !self.resolved else { return }
+            
             var resolved: DarwinBoolean = false
             let addressData = CFHostGetAddressing(host, &resolved)?.takeUnretainedValue() as [AnyObject]?
             guard let addresses = addressData as? [Data], resolved.boolValue else {
@@ -184,10 +172,7 @@ private extension HostResolver {
             }.compactMap { $0 }
 
             self.resolved = true
-            self.debugLog("Resolved hosts: \(socketAddresses)")
             self.complete(.success(socketAddresses))
         }
     }
 }
-
-private let defaultNTPPort: Int = 123

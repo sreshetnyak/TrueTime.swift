@@ -13,8 +13,7 @@ protocol TimedOperation: AnyObject {
     var timeout: TimeInterval { get }
     var timer: DispatchSourceTimer? { get set }
     var timerQueue: DispatchQueue { get }
-
-    func debugLog(_ message: @autoclosure () -> String)
+    
     func timeoutError(_ error: NSError)
 }
 
@@ -25,7 +24,6 @@ extension TimedOperation {
         timer?.schedule(deadline: .now() + timeout)
         timer?.setEventHandler {
             guard self.started else { return }
-            self.debugLog("Got timeout for \(self)")
             self.timeoutError(NSError(trueTimeError: .timedOut))
         }
         timer?.resume()

@@ -55,6 +55,7 @@ struct FrozenNetworkTime: FrozenTime {
 }
 
 extension FrozenTime {
+    
     var uptimeInterval: TimeInterval {
         let currentUptime = timeval.uptime()
         return TimeInterval(milliseconds: currentUptime.milliseconds - uptime.milliseconds)

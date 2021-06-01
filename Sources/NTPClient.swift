@@ -16,17 +16,17 @@ struct NTPConfig {
 }
 
 final class NTPClient {
+    
     let config: NTPConfig
+    
     init(config: NTPConfig) {
         self.config = config
     }
 
     func start(pool: [String], port: Int) {
-//        precondition(!pool.isEmpty, "Must include at least one pool URL")
         guard !pool.isEmpty else { return }
         guard self.reachability.callback == nil else { return }
         queue.async {
-//            precondition(self.reachability.callback == nil, "Already started")
             self.pool = pool
             self.port = port
             self.reachability.callbackQueue = self.queue
@@ -50,8 +50,7 @@ final class NTPClient {
                        completion: ReferenceTimeCallback?) {
         queue.async {
             guard self.reachability.callback != nil else { return }
-//            precondition(self.reachability.callback != nil,
-//                         "Must start client before retrieving time")
+            
             if let time = self.referenceTime {
                 callbackQueue.async { first?(.success(time)) }
             } else if let first = first {
@@ -70,18 +69,12 @@ final class NTPClient {
     }
 
     private let referenceTimeLock: GCDLock<ReferenceTime?> = GCDLock(value: nil)
+    
     var referenceTime: ReferenceTime? {
         get { return referenceTimeLock.read() }
         set { referenceTimeLock.write(newValue) }
     }
 
-    fileprivate func debugLog(_ message: @autoclosure () -> String) {
-#if DEBUG_LOGGING
-        logger?(message())
-#endif
-    }
-
-    var logger: LogCallback? = defaultLogger
     private let queue = DispatchQueue(label: "com.instacart.ntp.client")
     private let reachability = Reachability()
     private var completionCallbacks: [(DispatchQueue, ReferenceTimeCallback)] = []
@@ -98,15 +91,15 @@ final class NTPClient {
 }
 
 private extension NTPClient {
+    
     var started: Bool { return startTime != nil }
+    
     func updateReachability(status: ReachabilityStatus) {
         switch status {
         case .notReachable:
-            debugLog("Network unreachable")
             cancelTimer()
             finish(.failure(NSError(trueTimeError: .offline)))
         case .reachableViaWWAN, .reachableViaWiFi:
-            debugLog("Network reachable")
             startTimer()
             startPool(pool: pool, port: port)
         }
@@ -129,26 +122,17 @@ private extension NTPClient {
     }
 
     func startPool(pool: [String], port: Int) {
-        guard !started && !finished else {
-            debugLog("Already \(started ? "started" : "finished")")
-            return
-        }
-
+        guard !started && !finished else { return }
+        
         startTime = CFAbsoluteTimeGetCurrent()
-        debugLog("Resolving pool: \(pool)")
+        
         HostResolver.resolve(hosts: pool.map { ($0, port) },
                              timeout: config.timeout,
-                             logger: logger,
                              callbackQueue: queue) { resolver, result in
-            guard self.started && !self.finished else {
-                self.debugLog("Got DNS response after queue stopped: \(resolver), \(result)")
-                return
-            }
-            guard pool == self.pool, port == self.port else {
-                self.debugLog("Got DNS response after pool URLs changed: \(resolver), \(result)")
-                return
-            }
-
+            
+            guard self.started && !self.finished else { return }
+            guard pool == self.pool, port == self.port else { return }
+            
             switch result {
             case let .success(addresses): self.query(addresses: addresses, host: resolver.host)
             case let .failure(error): self.finish(.failure(error))
@@ -157,7 +141,6 @@ private extension NTPClient {
     }
 
     func stopQueue() {
-        debugLog("Stopping queue")
         startTime = nil
         connections.forEach { $0.close(waitUntilFinished: true) }
         connections = []
@@ -166,21 +149,20 @@ private extension NTPClient {
     func invalidate() {
         stopQueue()
         finished = false
-        if let referenceTime = referenceTime,
-               reachability.status != .notReachable && !pool.isEmpty {
-            debugLog("Invalidated time \(referenceTime.debugDescription)")
+        if referenceTime != nil , reachability.status != .notReachable && !pool.isEmpty {
             startPool(pool: pool, port: port)
         }
     }
 
     func query(addresses: [SocketAddress], host: String) {
+        
         var results: [String: [FrozenNetworkTimeResult]] = [:]
+        
         connections = NTPConnection.query(addresses: addresses,
                                           config: config,
-                                          logger: logger,
                                           callbackQueue: queue) { connection, result in
+            
             guard self.started && !self.finished else {
-                self.debugLog("Got NTP response after queue stopped: \(result)")
                 return
             }
 
@@ -195,13 +177,9 @@ private extension NTPClient {
                 results.compactMap { try? $0.get() }
             }
 
-            self.debugLog("Got \(sampleSize) out of \(expectedCount)")
             if let time = bestTime(fromResponses: times) {
                 let time = FrozenNetworkTime(networkTime: time, sampleSize: sampleSize, host: host)
-                self.debugLog("\(atEnd ? "Final" : "Best") time: \(time), " +
-                              "δ: \(time.serverResponse.delay), " +
-                              "θ: \(time.serverResponse.offset)")
-
+                
                 let referenceTime = self.referenceTime ?? ReferenceTime(time)
                 if self.referenceTime == nil {
                     self.referenceTime = referenceTime
@@ -228,23 +206,17 @@ private extension NTPClient {
     }
 
     func updateProgress(_ result: ReferenceTimeResult) {
-        let endTime = CFAbsoluteTimeGetCurrent()
-        let hasStartCallbacks = !startCallbacks.isEmpty
         startCallbacks.forEach { queue, callback in
             queue.async {
                 callback(result)
             }
         }
+        
         startCallbacks = []
-        if hasStartCallbacks {
-            logDuration(endTime, to: "get first result")
-        }
-
         NotificationCenter.default.post(Notification(name: .TrueTimeUpdated, object: self, userInfo: nil))
     }
 
     func finish(_ result: ReferenceTimeResult) {
-        let endTime = CFAbsoluteTimeGetCurrent()
         updateProgress(result)
         completionCallbacks.forEach { queue, callback in
             queue.async {
@@ -252,15 +224,8 @@ private extension NTPClient {
             }
         }
         completionCallbacks = []
-        logDuration(endTime, to: "get last result")
         finished = (try? result.get()) != nil
         stopQueue()
         startTimer()
-    }
-
-    func logDuration(_ endTime: CFAbsoluteTime, to description: String) {
-        if let startTime = startTime {
-            debugLog("Took \(endTime - startTime)s to \(description)")
-        }
     }
 }

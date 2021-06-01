@@ -16,8 +16,11 @@ enum ReachabilityStatus {
 }
 
 final class Reachability {
+    
     var callback: ((ReachabilityStatus) -> Void)?
+    
     var callbackQueue: DispatchQueue = .main
+    
     var status: ReachabilityStatus? {
         if let networkReachability = self.networkReachability {
             var flags = SCNetworkReachabilityFlags()
@@ -27,6 +30,7 @@ final class Reachability {
         }
         return nil
     }
+    
     var online: Bool {
         return status != nil && status != .notReachable
     }

@@ -45,7 +45,6 @@ public final class ReferenceTime: NSObject {
 
 public typealias ReferenceTimeResult = Result<ReferenceTime, NSError>
 public typealias ReferenceTimeCallback = (ReferenceTimeResult) -> Void
-public typealias LogCallback = (String) -> Void
 
 @objc public final class TrueTimeClient: NSObject {
     @objc public static let sharedInstance = TrueTimeClient()
@@ -55,12 +54,14 @@ public typealias LogCallback = (String) -> Void
                                maxServers: Int = 5,
                                numberOfSamples: Int = 4,
                                pollInterval: TimeInterval = 512) {
+        
         config = NTPConfig(timeout: timeout,
                            maxRetries: maxRetries,
                            maxConnections: maxConnections,
                            maxServers: maxServers,
                            numberOfSamples: numberOfSamples,
                            pollInterval: pollInterval)
+        
         ntp = NTPClient(config: config)
     }
 
@@ -78,14 +79,6 @@ public typealias LogCallback = (String) -> Void
         ntp.fetchIfNeeded(queue: callbackQueue, first: first, completion: completion)
     }
 
-#if DEBUG_LOGGING
-    @objc public var logCallback: LogCallback? = defaultLogger {
-        didSet {
-            ntp.logger = logCallback
-        }
-    }
-#endif
-
     @objc public var referenceTime: ReferenceTime? { return ntp.referenceTime }
     @objc public var timeout: TimeInterval { return config.timeout }
     @objc public var maxRetries: Int { return config.maxRetries }
@@ -98,6 +91,7 @@ public typealias LogCallback = (String) -> Void
 }
 
 extension TrueTimeClient {
+    
     @objc public func fetchFirstIfNeeded(success: @escaping (ReferenceTime) -> Void, failure: ((NSError) -> Void)?) {
         fetchFirstIfNeeded(success: success, failure: failure, onQueue: .main)
     }
@@ -133,5 +127,3 @@ extension TrueTimeClient {
         }
     }
 }
-
-let defaultLogger: LogCallback = { print($0) }
