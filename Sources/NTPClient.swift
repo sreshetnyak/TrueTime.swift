@@ -22,9 +22,11 @@ final class NTPClient {
     }
 
     func start(pool: [String], port: Int) {
-        precondition(!pool.isEmpty, "Must include at least one pool URL")
+//        precondition(!pool.isEmpty, "Must include at least one pool URL")
+        guard !pool.isEmpty else { return }
+        guard self.reachability.callback == nil else { return }
         queue.async {
-            precondition(self.reachability.callback == nil, "Already started")
+//            precondition(self.reachability.callback == nil, "Already started")
             self.pool = pool
             self.port = port
             self.reachability.callbackQueue = self.queue
@@ -47,8 +49,9 @@ final class NTPClient {
                        first: ReferenceTimeCallback?,
                        completion: ReferenceTimeCallback?) {
         queue.async {
-            precondition(self.reachability.callback != nil,
-                         "Must start client before retrieving time")
+            guard self.reachability.callback != nil else { return }
+//            precondition(self.reachability.callback != nil,
+//                         "Must start client before retrieving time")
             if let time = self.referenceTime {
                 callbackQueue.async { first?(.success(time)) }
             } else if let first = first {
