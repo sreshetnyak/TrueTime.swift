@@ -9,6 +9,8 @@
 @testable import TrueTime
 import Nimble
 import Quick
+import Foundation
+import CTrueTime
 
 final class NTPIntegrationSpec: QuickSpec {
     override func spec() {
@@ -57,12 +59,12 @@ private extension NTPIntegrationSpec {
 
             for (idx, client) in clients.enumerated() {
                 client.start(pool: ["time.apple.com"])
-                client.fetchIfNeeded { result in
+                client.fetchIfNeeded(completion:  { result in
                     results[idx] = result
                     if !results.contains(where: { $0 == nil }) {
                         finish()
                     }
-                }
+                })
             }
         }
     }
